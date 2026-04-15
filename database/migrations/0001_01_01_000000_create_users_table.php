@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->unsignedBigInteger('fpl_team_id')->nullable();
-            $table->string('profile_picture')->nullable();
+            $table->string('avatar')->nullable();
             $table->enum('role', ['user', 'admin'])->default('user');
             $table->string('otp')->nullable();
             $table->boolean('is_otp_verified')->default(false);
@@ -28,7 +28,6 @@ return new class extends Migration
             $table->rememberToken();
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->boolean('is_agreed_terms')->default(true);
-            $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
         });

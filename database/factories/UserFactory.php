@@ -27,9 +27,19 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'fpl_team_id' => null,
+            'avatar' => null,
+            'role' => 'user',
+            'otp' => null,
+            'is_otp_verified' => true,
+            'otp_expires_at' => null,
+            'reset_password_token' => null,
+            'reset_password_token_expire_at' => null,
+            'last_seen' => null,
             'remember_token' => Str::random(10),
+            'status' => 'active',
+            'is_agreed_terms' => true,
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
@@ -37,12 +47,22 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Indicate that the user's email OTP is not verified yet (registration incomplete).
      */
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'is_otp_verified' => false,
+        ]);
+    }
+
+    /**
+     * Email OTP verified (can use API login).
+     */
+    public function verified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_otp_verified' => true,
         ]);
     }
 
