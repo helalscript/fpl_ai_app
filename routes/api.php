@@ -33,13 +33,45 @@ Route::prefix('auth')->group(function () {
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
     });
 
-
 });
 
-    Route::prefix('fpl')->group(function () {
-    // Route::prefix('fpl')->middleware('auth:sanctum')->group(function () {
-        Route::post('/dashboard', [FplController::class, 'dashboard']);
-        Route::post('/chat', [FplController::class, 'chat']);
-        Route::get('/players', [FplController::class, 'getAllPlayerData']);
-        Route::get('/player/{playerId}', [FplController::class, 'getPlayerData']);
-    });
+Route::prefix('fpl')->group(function () {
+    Route::get('/assets/badge/{teamId}.svg', [FplController::class, 'teamBadgeImage']);
+    Route::get('/assets/jersey/{teamId}.svg', [FplController::class, 'teamJerseyImage']);
+    // home page
+    Route::get('/home-page', [FplController::class, 'homePage']);
+    Route::get('/home-page/gameweek-details', [FplController::class, 'gameweekDetails']);
+    Route::get('/home-page/transfer-suggestions', [FplController::class, 'transferSuggestions']);
+    Route::get('/home-page/captaincy-suggestion', [FplController::class, 'captaincySuggestion']);
+    Route::get('/home-page/squad-recommendation', [FplController::class, 'squadRecommendation']);
+    Route::get('/home-page/bench-players', [FplController::class, 'benchPlayers']);
+
+    // fixtures page
+    Route::get('/fixtures-page', [FplController::class, 'fixturesPage']);
+    Route::get('/fixtures-page/list', [FplController::class, 'fixturesList']);
+    Route::get('/fixtures-page/fdr', [FplController::class, 'fixturesFdr']);
+
+    // transfer page
+    Route::get('/transfer-page', [FplController::class, 'transferPage']);
+    Route::get('/transfer-page/primary', [FplController::class, 'transferPrimary']);
+    Route::get('/transfer-page/options', [FplController::class, 'transferOptions']);
+    Route::get('/transfer-page/insights', [FplController::class, 'transferInsights']);
+
+    // optimizer page
+    Route::get('/optimizer/recommended-captain', [FplController::class, 'recommendedCaptain']);
+    Route::get('/optimizer/recommended-vice-captain', [FplController::class, 'recommendedViceCaptain']);
+    Route::get('/optimizer/starting-xi', [FplController::class, 'optimizedStartingXI']);
+    Route::get('/optimizer/bench', [FplController::class, 'optimizedBench']);
+    Route::get('/optimizer/insights', [FplController::class, 'optimizerInsights']);
+
+    // dashboard
+    Route::post('/dashboard', [FplController::class, 'dashboard']);
+
+    // chat
+    Route::post('/chat', [FplController::class, 'chat']);
+    Route::post('/chat/stream', [FplController::class, 'chatStream']);
+
+    // players
+    Route::get('/players', [FplController::class, 'players']);
+    Route::get('/player/{playerId}', [FplController::class, 'getPlayerData']);
+});
