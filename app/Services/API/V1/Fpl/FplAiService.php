@@ -43,12 +43,13 @@ class FplAiService
         int $teamId,
         ?User $user = null,
         array $history = [],
-        ?string $conversationId = null
+        ?string $conversationId = null,
+        bool $isFirstUserMessageToday = false,
     ): AgentResponse {
         $agent = $this->buildChatAgent($user, $conversationId);
 
         return $agent->prompt(
-            $this->buildChatPrompt($teamId, $message, $user, $history),
+            $this->buildChatPrompt($teamId, $message, $user, $history, $isFirstUserMessageToday),
             provider: Lab::OpenAI,
             model: 'gpt-4o'
         );
@@ -62,12 +63,13 @@ class FplAiService
         int $teamId,
         ?User $user = null,
         array $history = [],
-        ?string $conversationId = null
+        ?string $conversationId = null,
+        bool $isFirstUserMessageToday = false,
     ): StreamableAgentResponse {
         $agent = $this->buildChatAgent($user, $conversationId);
 
         return $agent->stream(
-            $this->buildChatPrompt($teamId, $message, $user, $history),
+            $this->buildChatPrompt($teamId, $message, $user, $history, $isFirstUserMessageToday),
             provider: Lab::OpenAI,
             model: 'gpt-4o'
         );
@@ -130,8 +132,13 @@ PROMPT;
     /**
      * Build the chat prompt using user identity and live FPL context.
      */
-    protected function buildChatPrompt(int $teamId, string $message, ?User $user, array $history = []): string
-    {
+    protected function buildChatPrompt(
+        int $teamId,
+        string $message,
+        ?User $user,
+        array $history = [],
+        bool $isFirstUserMessageToday = false,
+    ): string {
         $teamData = $this->fpl->getFullTeamData($teamId);
 
         $context = [
@@ -151,11 +158,15 @@ PROMPT;
             'bench_players' => $this->summarizePlayers($teamData['bench_players'] ?? []),
             'transfer_suggestions' => $teamData['transfer_suggestions'] ?? [],
             'captaincy_suggestion' => $teamData['captaincy_suggestion'] ?? [],
-            'history' => array_slice($history, -10),
+            'history' => array_slice($history, -20),
+            'conversation_state' => [
+                'is_first_user_message_today' => $isFirstUserMessageToday,
+                'greeting_rule' => 'If is_first_user_message_today is true, you may open with one short professional greeting (optionally using their first name), then go straight to FPL guidance. If false, do not use generic greetings like Hi/Hello/Welcome back/admin — answer directly with FPL analysis.',
+            ],
             'instructions' => [
-                'answer_style' => 'helpful, concise, and practical',
-                'goal' => 'give the best possible FPL advice for the current team',
-                'fallback' => 'if the request is ambiguous, make the most reasonable assumption and state it briefly',
+                'answer_style' => 'professional, concise, and evidence-led',
+                'goal' => 'maximise the manager\'s chance of a strong gameweek outcome using the supplied squad and fixture context',
+                'fallback' => 'if the request is ambiguous, state your main assumption in one short clause then proceed',
             ],
         ];
 
@@ -171,11 +182,11 @@ User message:
 {$message}
 
 Response rules:
-- Be friendly and helpful.
-- Use the user's name naturally when appropriate.
-- Base the answer on the team context above.
-- If recommending a transfer, captain, bench choice, or chip decision, explain why in one or two clear points.
-- Keep the answer focused on the user's question and avoid unnecessary filler.
+- Sound like a knowledgeable FPL analyst: clear structure, decisive recommendations where appropriate, and calm confidence (no hype or filler).
+- Base every claim on the team context above; if data is missing, say what you are inferring.
+- If recommending a transfer, captain, bench order, or chip, give one or two concrete reasons (fixtures, minutes, form, price, or team structure).
+- Use the user's name sparingly and only when it reads naturally.
+- Keep the reply focused on the question; avoid repeating generic pleasantries across turns.
 PROMPT;
     }
 

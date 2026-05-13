@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\API\V1\Auth;
 
 use App\Http\Controllers\API\Concerns\ApiResponses;
-use App\Http\Requests\API\V1\Auth\SocialLoginRequest;
 use App\Http\Resources\API\V1\UserResource;
 use App\Services\API\V1\Auth\SocialLoginService;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class SocialLoginController
@@ -19,7 +19,7 @@ class SocialLoginController
         //
     }
 
-    public function SocialLogin(SocialLoginRequest $request): JsonResponse
+    public function SocialLogin(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'provider' => 'required|in:google',

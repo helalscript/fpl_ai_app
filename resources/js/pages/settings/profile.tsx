@@ -28,7 +28,7 @@ export default function Profile({
                 <Heading
                     variant="small"
                     title="Profile information"
-                    description="Update your name and email address"
+                    description="Update your name, email address, and optional Fantasy Premier League team ID"
                 />
 
                 <Form
@@ -76,6 +76,30 @@ export default function Profile({
                                 <InputError
                                     className="mt-2"
                                     message={errors.email}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="fpl_team_id">FPL team ID</Label>
+
+                                <Input
+                                    id="fpl_team_id"
+                                    type="number"
+                                    min={1}
+                                    className="mt-1 block w-full"
+                                    defaultValue={
+                                        auth.user.fpl_team_id != null
+                                            ? String(auth.user.fpl_team_id)
+                                            : ''
+                                    }
+                                    name="fpl_team_id"
+                                    autoComplete="off"
+                                    placeholder="Your Fantasy Premier League entry ID"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.fpl_team_id}
                                 />
                             </div>
 

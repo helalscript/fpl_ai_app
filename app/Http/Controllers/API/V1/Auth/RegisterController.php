@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\API\V1\Auth;
 
-use App\Http\Controllers\Api\Concerns\ApiResponses;
+use App\Http\Controllers\API\Concerns\ApiResponses;
 use App\Http\Requests\API\V1\Auth\RegisterRequest;
 use App\Http\Requests\API\V1\Auth\ResendOtpRequest;
 use App\Http\Requests\API\V1\Auth\VerifyEmailRequest;

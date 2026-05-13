@@ -4,20 +4,27 @@ namespace App\Http\Controllers\API\V1\User;
 
 use App\Http\Controllers\API\Concerns\ApiResponses;
 use App\Http\Controllers\Controller;
+use App\Models\FplChatMessage;
+use App\Models\User;
 use App\Services\API\V1\Fpl\FplAiService;
 use App\Services\API\V1\Fpl\FplService;
+use App\Services\Fpl\FplChatMessageService;
 use Exception;
-use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class FplController extends Controller
 {
     use ApiResponses;
 
-    public function __construct(protected FplAiService $fplAi, protected FplService $fplService) {}
+    public function __construct(
+        protected FplAiService $fplAi,
+        protected FplService $fplService,
+        protected FplChatMessageService $chatMessages,
+    ) {}
 
     /**
      * Analyse a full team dashboard through the AI service.
@@ -361,7 +368,7 @@ class FplController extends Controller
     /**
      * Chat with the FPL AI assistant using the current team context.
      */
-    public function chat(Request $request): JsonResponse|Responsable
+    public function chat(Request $request): JsonResponse|SymfonyResponse
     {
         if ($this->shouldStreamChat($request)) {
             return $this->chatStream($request);
@@ -373,7 +380,7 @@ class FplController extends Controller
     /**
      * Stream the chat response as server-sent events.
      */
-    public function chatStream(Request $request): JsonResponse|Responsable
+    public function chatStream(Request $request): JsonResponse|SymfonyResponse
     {
         return $this->chatResponse($request, true);
     }
@@ -381,10 +388,11 @@ class FplController extends Controller
     /**
      * Resolve and execute the chat request in either JSON or streaming mode.
      */
-    protected function chatResponse(Request $request, bool $stream = false): JsonResponse|Responsable
+    protected function chatResponse(Request $request, bool $stream = false): JsonResponse|SymfonyResponse
     {
         $validated = $request->validate([
             'team_id' => 'nullable|integer|min:1',
+            'thread_id' => 'nullable|integer|min:1',
             'message' => 'required|string|max:1000',
             'history' => 'nullable|array',
             'conversation_id' => 'nullable|string|max:100',
@@ -397,21 +405,101 @@ class FplController extends Controller
             return self::jsonErrorResponse('team_id is required.', 422);
         }
 
-        $conversationId = $validated['conversation_id'] ?? null;
-        $history = $validated['history'] ?? [];
+        if ($user instanceof User && ! $this->chatMessages->teamIdAllowedForUser($user, $teamId)) {
+            return self::jsonErrorResponse(
+                'The team_id must match your FPL entry ID saved on your profile.',
+                422
+            );
+        }
+
+        $threadDbId = null;
+        $aiConversationId = $validated['conversation_id'] ?? null;
+
+        if ($user instanceof User) {
+            $requestedThreadId = isset($validated['thread_id']) ? (int) $validated['thread_id'] : null;
+
+            if ($requestedThreadId !== null) {
+                $thread = $this->chatMessages->findConversationForUser($requestedThreadId, $user, $teamId);
+
+                if ($thread === null) {
+                    return self::jsonErrorResponse('Invalid thread_id for this team.', 422);
+                }
+            } else {
+                $thread = $this->chatMessages->defaultConversationForTeam($user, $teamId);
+            }
+
+            $threadDbId = (int) $thread->id;
+            $aiConversationId ??= 'fpl-thread-'.$threadDbId;
+
+            $history = $this->chatMessages->historyForPrompt($user->id, $teamId, $threadDbId, 20);
+            $isFirstUserMessageToday = ! $this->chatMessages->hasUserMessageToday($user->id, $teamId, $threadDbId);
+            $this->chatMessages->storeMessage(
+                $user,
+                $teamId,
+                $threadDbId,
+                FplChatMessage::ROLE_USER,
+                $validated['message'],
+            );
+        } else {
+            $history = $validated['history'] ?? [];
+            $isFirstUserMessageToday = false;
+        }
 
         try {
+            if ($stream) {
+                ignore_user_abort(true);
+                set_time_limit(0);
+            }
+
             $response = $stream
-                ? $this->fplAi->streamChat($validated['message'], $teamId, $user, $history, $conversationId)
-                : $this->fplAi->chat($validated['message'], $teamId, $user, $history, $conversationId);
+                ? $this->fplAi->streamChat(
+                    $validated['message'],
+                    $teamId,
+                    $user,
+                    $history,
+                    $aiConversationId,
+                    $isFirstUserMessageToday,
+                )
+                : $this->fplAi->chat(
+                    $validated['message'],
+                    $teamId,
+                    $user,
+                    $history,
+                    $aiConversationId,
+                    $isFirstUserMessageToday,
+                );
 
             if ($stream) {
+                if ($user instanceof User && $threadDbId !== null) {
+                    return $this->chatMessages->streamSseAndPersistAssistantDraft(
+                        $response,
+                        $user,
+                        $teamId,
+                        $threadDbId,
+                    );
+                }
+
                 return $response;
+            }
+
+            if ($user instanceof User && $threadDbId !== null) {
+                $assistantText = trim((string) ($response->text ?? ''));
+
+                if ($assistantText !== '') {
+                    $this->chatMessages->storeMessage(
+                        $user,
+                        $teamId,
+                        $threadDbId,
+                        FplChatMessage::ROLE_ASSISTANT,
+                        $assistantText,
+                    );
+                }
             }
 
             return self::jsonResponse(true, 'Chat response fetched successfully.', 200, [
                 'message' => $response->text,
                 'conversation_id' => $response->conversationId,
+                'thread_id' => $threadDbId,
                 'user' => $user ? [
                     'id' => $user->id,
                     'name' => $user->name,

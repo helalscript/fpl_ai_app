@@ -1,14 +1,22 @@
 <?php
 
 use App\Ai\Agents\FplChatAssistant;
+use App\Models\FplChatConversation;
+use App\Models\FplChatMessage;
 use App\Models\User;
+use App\Services\Fpl\FplChatMessageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
+
+afterEach(function () {
+    Carbon::setTestNow();
+});
 
 test('home page endpoint returns structured fpl card data', function () {
     Cache::flush();
@@ -501,9 +509,11 @@ test('fixtures page endpoint returns grouped fixtures and fdr matrix payloads', 
 });
 
 test('chat endpoint uses authenticated user context and streams on demand', function () {
+    Carbon::setTestNow('2026-05-13 12:00:00');
+
     Cache::flush();
 
-    $user = User::factory()->make([
+    $user = User::factory()->create([
         'id' => 91,
         'name' => 'Alex Mercer',
         'email' => 'alex@example.com',
@@ -511,6 +521,8 @@ test('chat endpoint uses authenticated user context and streams on demand', func
     ]);
 
     Sanctum::actingAs($user);
+
+    $capturedPrompts = [];
 
     $bootstrap = [
         'element_types' => [
@@ -575,7 +587,8 @@ test('chat endpoint uses authenticated user context and streams on demand', func
         return Http::response([], 404);
     });
 
-    FplChatAssistant::fake(function (string $prompt) {
+    FplChatAssistant::fake(function (string $prompt) use (&$capturedPrompts) {
+        $capturedPrompts[] = $prompt;
         expect($prompt)->toContain('Alex Mercer');
         expect($prompt)->toContain('"team_id": 30');
         expect($prompt)->toContain('"fpl_team_id": 30');
@@ -592,6 +605,19 @@ test('chat endpoint uses authenticated user context and streams on demand', func
     $jsonResponse->assertJsonPath('data.user.name', 'Alex Mercer');
     $jsonResponse->assertJsonPath('data.team_id', 30);
     expect($jsonResponse->json('data.message'))->toContain('You should captain Salah');
+    expect($capturedPrompts[0] ?? '')->toContain('"is_first_user_message_today": true');
+
+    $threadDbId = (int) $jsonResponse->json('data.thread_id');
+    expect($threadDbId)->toBeGreaterThan(0);
+
+    $chatMessages = app(FplChatMessageService::class);
+    expect($chatMessages->hasUserMessageToday($user->id, 30, $threadDbId))->toBeTrue();
+
+    FplChatAssistant::fake(function (string $prompt) use (&$capturedPrompts) {
+        $capturedPrompts[] = $prompt;
+
+        return 'You should captain Salah and bench Pickford.';
+    });
 
     $streamResponse = $this->post('/api/fpl/chat/stream', [
         'message' => 'Who should I captain?',
@@ -602,6 +628,49 @@ test('chat endpoint uses authenticated user context and streams on demand', func
     expect($streamResponse->streamedContent())->toContain('data:');
     expect($streamResponse->streamedContent())->toContain('"type":"text_delta"');
     expect($streamResponse->streamedContent())->toContain('"delta":" Salah"');
+    $flags = implode("\n", $capturedPrompts);
+    expect(substr_count($flags, '"is_first_user_message_today": true'))->toBe(1);
+    expect(substr_count($flags, '"is_first_user_message_today": false'))->toBe(1);
+    expect(FplChatMessage::query()->where('user_id', $user->id)->count())->toBe(4);
+});
+
+test('api exposes chat message history for reload after mobile refresh', function () {
+    $user = User::factory()->create(['fpl_team_id' => 77]);
+
+    Sanctum::actingAs($user);
+
+    $thread = FplChatConversation::query()->create([
+        'user_id' => $user->id,
+        'fpl_team_id' => 77,
+        'last_message_at' => now(),
+    ]);
+
+    FplChatMessage::query()->create([
+        'user_id' => $user->id,
+        'fpl_team_id' => 77,
+        'fpl_chat_conversation_id' => $thread->id,
+        'role' => FplChatMessage::ROLE_USER,
+        'content' => 'Hi from API',
+    ]);
+
+    FplChatMessage::query()->create([
+        'user_id' => $user->id,
+        'fpl_team_id' => 77,
+        'fpl_chat_conversation_id' => $thread->id,
+        'role' => FplChatMessage::ROLE_ASSISTANT,
+        'content' => 'Reply persisted',
+    ]);
+
+    $response = $this->getJson('/api/fpl/chat/messages?team_id=77&thread_id='.$thread->id);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.has_more_older', false);
+    $response->assertJsonPath('data.has_more_newer', false);
+    $response->assertJsonCount(2, 'data.messages');
+    $response->assertJsonPath('data.messages.0.role', FplChatMessage::ROLE_USER);
+    $response->assertJsonPath('data.messages.0.content', 'Hi from API');
+    $response->assertJsonPath('data.messages.1.role', FplChatMessage::ROLE_ASSISTANT);
+    $response->assertJsonPath('data.messages.1.content', 'Reply persisted');
 });
 
 test('player search endpoint filters results and marks owned players', function () {

@@ -17,6 +17,7 @@ trait ProfileValidationRules
         return [
             'name' => $this->nameRules(),
             'email' => $this->emailRules($userId),
+            'fpl_team_id' => $this->fplTeamIdRules(),
         ];
     }
 
@@ -46,5 +47,13 @@ trait ProfileValidationRules
                 ? Rule::unique(User::class)
                 : Rule::unique(User::class)->ignore($userId),
         ];
+    }
+
+    /**
+     * @return array<int, \Illuminate\Contracts\Validation\Rule|array<mixed>|string>
+     */
+    protected function fplTeamIdRules(): array
+    {
+        return ['nullable', 'integer', 'min:1'];
     }
 }

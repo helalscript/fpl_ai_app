@@ -19,4 +19,11 @@ class ProfileUpdateRequest extends FormRequest
     {
         return $this->profileRules($this->user()->id);
     }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('fpl_team_id') && $this->input('fpl_team_id') === '') {
+            $this->merge(['fpl_team_id' => null]);
+        }
+    }
 }

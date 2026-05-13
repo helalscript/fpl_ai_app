@@ -52,14 +52,13 @@ class AuthController
             $user = $request->user();
             $validated = $request->validated();
             if ($request->hasFile('avatar')) {
-                if (!empty($user->avatar)) {
+                if (! empty($user->avatar)) {
                     Helper::fileDelete(public_path($user->getRawOriginal('avatar')));
                 }
                 $avatarPath = Helper::fileUpload($request->file('avatar'), 'user/avatar', Helper::getFileName($request->file('avatar')));
                 $validated['avatar'] = $avatarPath;
             }
-        
-           
+
             $user->fill($validated);
             $user->save();
 
@@ -89,6 +88,26 @@ class AuthController
             Log::error('AuthController@updatePassword: '.$e->getMessage());
 
             return self::jsonErrorResponse('Failed to update password.', 500);
+        }
+    }
+
+    public function updateFplTeamId(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'fpl_team_id' => ['required', 'integer', 'min:1'],
+            ]);
+            $user = $request->user();
+            $user->fpl_team_id = $validated['fpl_team_id'];
+            $user->save();
+
+            return self::jsonResponse(true, 'FPL team updated successfully.', 200, [
+                'user' => new UserResource($user->refresh()),
+            ]);
+        } catch (Exception $e) {
+            Log::error('AuthController@updateFplTeamId: '.$e->getMessage());
+
+            return self::jsonErrorResponse('Failed to update FPL team.', 500);
         }
     }
 }

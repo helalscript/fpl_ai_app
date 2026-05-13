@@ -1,10 +1,13 @@
 <?php
 
-use App\Http\Controllers\Api\V1\Auth\AuthController;
-use App\Http\Controllers\Api\V1\Auth\LoginController;
-use App\Http\Controllers\Api\V1\Auth\RegisterController;
-use App\Http\Controllers\Api\V1\Auth\ResetPasswordController;
-use App\Http\Controllers\Api\V1\Auth\SocialLoginController;
+use App\Http\Controllers\API\V1\Auth\AuthController;
+use App\Http\Controllers\API\V1\Auth\LoginController;
+use App\Http\Controllers\API\V1\Auth\RegisterController;
+use App\Http\Controllers\API\V1\Auth\ResetPasswordController;
+use App\Http\Controllers\API\V1\Auth\SocialLoginController;
+use App\Http\Controllers\API\V1\User\FplChatConversationsController;
+use App\Http\Controllers\API\V1\User\FplChatMessagesController;
+use App\Http\Controllers\API\V1\User\FplChatPromptSuggestionsController;
 use App\Http\Controllers\API\V1\User\FplController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,11 +34,13 @@ Route::prefix('auth')->group(function () {
         Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
         Route::post('/update-profile', [AuthController::class, 'updateProfile']);
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
+        Route::post('/update-fpl-team', [AuthController::class, 'updateFplTeamId']);
+
     });
 
 });
 
-Route::prefix('fpl')->group(function () {
+Route::prefix('fpl')->middleware('auth:sanctum')->group(function () {
     Route::get('/assets/badge/{teamId}.svg', [FplController::class, 'teamBadgeImage']);
     Route::get('/assets/jersey/{teamId}.svg', [FplController::class, 'teamJerseyImage']);
     // home page
@@ -67,7 +72,12 @@ Route::prefix('fpl')->group(function () {
     // dashboard
     Route::post('/dashboard', [FplController::class, 'dashboard']);
 
-    // chat
+    // chat (history + threads mirror web JSON routes so mobile clients can reload after refresh)
+    Route::get('/chat/prompt-suggestions', FplChatPromptSuggestionsController::class);
+    Route::get('/chat/conversations', [FplChatConversationsController::class, 'index']);
+    Route::post('/chat/conversations', [FplChatConversationsController::class, 'store']);
+    Route::get('/chat/messages', [FplChatMessagesController::class, 'index']);
+    Route::delete('/chat/messages', [FplChatMessagesController::class, 'destroy']);
     Route::post('/chat', [FplController::class, 'chat']);
     Route::post('/chat/stream', [FplController::class, 'chatStream']);
 
