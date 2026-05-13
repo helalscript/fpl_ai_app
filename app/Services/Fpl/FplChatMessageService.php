@@ -72,8 +72,11 @@ class FplChatMessageService
             ->where('user_id', $user->id)
             ->where('fpl_team_id', $fplTeamId);
 
+        // Prefer any thread that actually has stored messages, even if `last_message_at` was not updated
+        // (e.g. older imports or manual inserts in tests).
         $withMessages = (clone $base)
-            ->whereNotNull('last_message_at')
+            ->whereHas('messages')
+            ->orderByRaw('case when last_message_at is null then 1 else 0 end')
             ->orderByDesc('last_message_at')
             ->orderByDesc('id')
             ->first();

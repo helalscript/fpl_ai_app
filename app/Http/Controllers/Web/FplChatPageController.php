@@ -30,8 +30,8 @@ class FplChatPageController extends Controller
             $initialThreadId = (int) $thread->id;
             $initialConversations = $this->chatMessages->listConversationsSummary($user->id, $teamId);
             $page = $this->chatMessages->messagesPageForUi($user->id, $teamId, $initialThreadId);
-            $initialMessages = $page['messages'];
-            $initialHasMoreOlder = $page['has_more_older'];
+            $initialMessages = is_array($page['messages'] ?? null) ? $page['messages'] : [];
+            $initialHasMoreOlder = (bool) ($page['has_more_older'] ?? false);
         }
 
         return Inertia::render('fpl-chat', [
