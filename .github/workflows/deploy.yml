@@ -1,43 +1,25 @@
 name: Deploy project to our server
-
 on:
   push:
     branches:
       - dev
-
 jobs:
   FTP-Deploy-Action:
-    name: FTP Deploy
+    name: FTP-Deploy-Action
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v2.1.0
         with:
           fetch-depth: 2
-
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4
+      - name: FTP-Deploy-Action
+        uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
           server: ${{ secrets.ftp_server }}
           username: ${{ secrets.ftp_user }}
           password: ${{ secrets.ftp_password }}
-
           protocol: ftp
           port: 21
 
-          local-dir: ./
-
-          dangerous-clean-slate: false
-
-          timeout: 120000
+          passive: true      
+          timeout: 120000      
           retries: 5
-
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.claude/**
-            **/.vscode/**
-            **/tests/**
-            **/.github/**
