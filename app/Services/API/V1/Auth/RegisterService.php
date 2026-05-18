@@ -3,7 +3,9 @@
 namespace App\Services\API\V1\Auth;
 
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RegisterService
 {
@@ -17,28 +19,35 @@ class RegisterService
      */
     public function register(array $payload): User
     {
-        $otp = $this->otpService->generateOtp();
+        try {
+            $otp = $this->otpService->generateOtp();
 
-        $user = DB::transaction(function () use ($payload, $otp): User {
-            $user = User::query()->create([
-                'name' => $payload['name'],
-                'email' => $payload['email'],
-                'password' => $payload['password'],
-                'fpl_team_id' => $payload['fpl_team_id'] ?? null,
-                'status' => 'active',
-                'role' => 'user',
-                'is_agreed_terms' => true,
-                'is_otp_verified' => false,
-            ]);
+            $user = DB::transaction(function () use ($payload, $otp): User {
+                $user = User::query()->create([
+                    'name' => $payload['name'],
+                    'email' => $payload['email'],
+                    'password' => $payload['password'],
+                    'fpl_team_id' => isset($payload['fpl_team_id']) ? $payload['fpl_team_id'] : null,
+                    'status' => 'active',
+                    'role' => 'user',
+                    'is_agreed_terms' => true,
+                    'is_otp_verified' => false,
+                ]);
 
-            $this->otpService->setOtp($user, $otp);
+                $this->otpService->setOtp($user, $otp);
 
-            return $user->refresh();
-        });
+                return $user->refresh();
 
-        $this->authMailService->sendOtpEmail($user, $otp, 'registration');
+            });
+            $this->authMailService->sendOtpEmail($user, $otp, 'registration');
 
-        return $user;
+            // $this->authMailService->sendOtpEmail($user, $otp, 'registration');
+
+            return $user;
+        } catch (Exception $e) {
+            Log::error('RegisterService@register: '.$e->getMessage());
+            throw $e;
+        }
     }
 
     /**

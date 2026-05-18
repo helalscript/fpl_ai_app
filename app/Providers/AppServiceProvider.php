@@ -5,8 +5,13 @@ namespace App\Providers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use InvalidArgumentException;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +29,26 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureBrevoMailTransport();
+    }
+
+    protected function configureBrevoMailTransport(): void
+    {
+        Mail::extend('brevo', function (array $config) {
+            $apiKey = $config['key'] ?? config('services.brevo.key');
+
+            if (blank($apiKey)) {
+                throw new InvalidArgumentException('BREVO_API_KEY is not configured.');
+            }
+
+            $factory = new BrevoTransportFactory(null, HttpClient::create());
+
+            return $factory->create(new Dsn(
+                'brevo+api',
+                'default',
+                $apiKey,
+            ));
+        });
     }
 
     /**
