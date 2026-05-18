@@ -9,8 +9,8 @@ class OtpService
 {
     public function generateOtp(): string
     {
-        // return (string) random_int(100000, 999999);
-        return '1234'; // for testing purposes
+        return (string) random_int(100000, 999999);
+        // return '1234'; // for testing purposes
     }
 
     public function setOtp(User $user, string $otp, int $ttlMinutes = 10): User
