@@ -17,7 +17,9 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^3.0",
-        "laravel/wayfinder": "^0.1.14"
+        "laravel/wayfinder": "^0.1.14",
+        "symfony/brevo-mailer": "^8.0",
+        "symfony/http-client": "^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",

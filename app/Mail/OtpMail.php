@@ -29,6 +29,7 @@ class OtpMail extends Mailable
         $subject = match ($this->purpose) {
             'password_reset' => __('Your password reset OTP'),
             'resend' => __('Your verification OTP'),
+            'registration' => __('Verify your email'),
             default => __('Verify your email'),
         };
 
@@ -40,6 +41,7 @@ class OtpMail extends Mailable
         $subject = match ($this->purpose) {
             'password_reset' => __('Your password reset OTP'),
             'resend' => __('Your verification OTP'),
+            'registration' => __('Verify your email'),
             default => __('Verify your email'),
         };
 
